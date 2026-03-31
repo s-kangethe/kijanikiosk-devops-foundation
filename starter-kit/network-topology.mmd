@@ -1,0 +1,19 @@
+graph TD
+    Internet --> IGW
+    IGW --> LB
+
+    subgraph AZ_A
+        LB --> PubA
+        PubA --> API1
+        API1 --> PrivA
+        PrivA --> DB1
+    end
+
+    subgraph AZ_B
+        LB --> PubB
+        PubB --> API2
+        API2 --> PrivB
+        PrivB --> DB2
+    end
+
+    DB1 --> DB2
