@@ -1,0 +1,1 @@
+The least privilege grants only the minimum permissions required for the application task. In this case, reading from a specific S3 bucket and writing logs to CloudWatch while explicitly avoiding unnecessary or broad access. The specific task is kk-api service needs to read product/payment data from S3 and write logs to CloudWatch.
