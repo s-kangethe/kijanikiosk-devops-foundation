@@ -1,0 +1,69 @@
+[2026-04-21 14:23:03] PHASE 1 - Packages
+Hit:1 http://ke.archive.ubuntu.com/ubuntu noble InRelease
+Hit:2 http://ke.archive.ubuntu.com/ubuntu noble-updates InRelease
+Hit:3 http://ke.archive.ubuntu.com/ubuntu noble-backports InRelease
+Hit:4 https://apt.releases.hashicorp.com noble InRelease
+Hit:5 https://packages.microsoft.com/repos/code stable InRelease
+Hit:6 http://security.ubuntu.com/ubuntu noble-security InRelease
+Hit:7 https://dl.google.com/linux/chrome/deb stable InRelease
+Hit:8 https://ppa.launchpadcontent.net/ansible/ansible/ubuntu noble InRelease
+Reading package lists...
+Reading package lists...
+Building dependency tree...
+Reading state information...
+nginx is already the newest version (1.24.0-2ubuntu7.6).
+curl is already the newest version (8.5.0-2ubuntu10.8).
+ufw is already the newest version (0.36.2-6).
+acl is already the newest version (2.3.2-1build1.1).
+logrotate is already the newest version (3.21.0-2build1).
+python3 is already the newest version (3.12.3-0ubuntu2.1).
+0 upgraded, 0 newly installed, 0 to remove and 85 not upgraded.
+[2026-04-21 14:23:12] PASS: Packages installed
+[2026-04-21 14:23:12] PHASE 2 - Users & Groups
+[2026-04-21 14:23:12] PASS: kk-api already exists
+[2026-04-21 14:23:12] PASS: kk-payments already exists
+[2026-04-21 14:23:12] PASS: kk-logs already exists
+[2026-04-21 14:23:12] PHASE 3 - Directories & Permissions
+[2026-04-21 14:23:12] PASS: Directory structure corrected
+[2026-04-21 14:23:12] PHASE 4 - ACL Model
+[2026-04-21 14:23:12] PASS: ACL permissions applied
+[2026-04-21 14:23:12] PHASE 5 - Environment Files
+PORT=3000
+PORT=3001
+PORT=3002
+[2026-04-21 14:23:12] PASS: Environment files secured
+[2026-04-21 14:23:12] PHASE 6 - Firewall
+Backing up 'user.rules' to '/etc/ufw/user.rules.20260421_142313'
+Backing up 'before.rules' to '/etc/ufw/before.rules.20260421_142313'
+Backing up 'after.rules' to '/etc/ufw/after.rules.20260421_142313'
+Backing up 'user6.rules' to '/etc/ufw/user6.rules.20260421_142313'
+Backing up 'before6.rules' to '/etc/ufw/before6.rules.20260421_142313'
+Backing up 'after6.rules' to '/etc/ufw/after6.rules.20260421_142313'
+
+Default incoming policy changed to 'deny'
+(be sure to update your rules accordingly)
+Default outgoing policy changed to 'allow'
+(be sure to update your rules accordingly)
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated (v6)
+Rules updated
+Rules updated
+Rules updated
+Rules updated (v6)
+Firewall is active and enabled on system startup
+[2026-04-21 14:23:15] PASS: Firewall configured
+[2026-04-21 14:23:15] PHASE 7 - systemd Services
+[2026-04-21 14:23:15] PASS: Services installed and started
+[2026-04-21 14:23:15] PHASE 8 - Logging
+[2026-04-21 14:23:15] PASS: Logging controls configured
+[2026-04-21 14:23:15] PHASE 9 - Health Check
+[2026-04-21 14:23:15] PASS: Health file written
+[2026-04-21 14:23:15] PHASE 10 - Final Verification
+[2026-04-21 14:23:15] PASS: kk-api exists
+[2026-04-21 14:23:15] PASS: kk-payments enabled
+[2026-04-21 14:23:15] PASS: logrotate present
+[2026-04-21 14:23:16] PASS: payments blocked externally
+[2026-04-21 14:23:16] PASS: health file exists
+[2026-04-21 14:23:16] SUCCESS - Provisioning complete
