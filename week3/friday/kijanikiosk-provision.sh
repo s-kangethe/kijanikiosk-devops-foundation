@@ -31,6 +31,25 @@ pass() { log "PASS: $*"; }
 
 fail() { log "FAIL: $*"; FAILED=1; }
 
+# --- DRIFT PROTECTION FUNCTION (ADD HERE) ---
+verify_package() {
+  local pkg=$1
+  local expected=$2
+  local actual
+
+  actual=$(dpkg-query -W -f='${Version}' "$pkg" 2>/dev/null || true)
+
+  if [[ -z "$actual" ]]; then
+    echo "FATAL: $pkg is not installed"
+    exit 1
+  fi
+
+  if [[ "$actual" != "$expected" ]]; then
+    echo "FATAL: $pkg drift detected ($actual != $expected)"
+    exit 1
+  fi
+}
+
 # ==========================================================
 # KijaniKiosk Production Provisioning Script
 # Final Week 3 Submission Version
@@ -46,28 +65,70 @@ fail() { log "FAIL: $*"; FAILED=1; }
 # - kk-* services may not exist
 # ==========================================================
 
+log "PHASE 1 - Preflight Package Drift Check"
+
+NGINX_EXPECTED="1.24.0-2ubuntu7.6"
+
+INSTALLED=$(dpkg-query -W -f='${Version}' nginx 2>/dev/null || true)
+
+if [[ -n "$INSTALLED" && "$INSTALLED" != "$NGINX_EXPECTED" ]]; then
+  log "DRIFT DETECTED: nginx=$INSTALLED expected=$NGINX_EXPECTED"
+  exit 1
+fi
+
+pass "Preflight package state OK"
+
 log "PHASE 1 - Packages"
 
 sudo apt-get update -y
-
+sudo apt-mark hold nginx nginx-common
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     nginx curl ufw acl logrotate python3
 
 log "PHASE D - Package Drift Protection"
 
 NGINX_EXPECTED="1.24.0-2ubuntu7.6"
-NGINX_INSTALLED=$(dpkg -l | awk '/nginx / {print $3}')
+DRIFT_LOG="/var/log/nginx-drift.log"
 
-if [ "$NGINX_INSTALLED" != "$NGINX_EXPECTED" ]; then
-    echo "❌ DRIFT DETECTED"
-    echo "Expected: $NGINX_EXPECTED"
-    echo "Found: $NGINX_INSTALLED"
+check_nginx_drift() {
+  local actual
+
+  actual=$(dpkg-query -W -f='${Version}' nginx 2>/dev/null || true)
+
+  echo "$(date '+%F %T') nginx=$actual" | sudo tee -a "$DRIFT_LOG" > /dev/null
+
+  if [[ "$actual" != "$NGINX_EXPECTED" ]]; then
+    echo "$(date '+%F %T') DRIFT DETECTED: expected=$NGINX_EXPECTED actual=$actual" | sudo tee -a "$DRIFT_LOG"
+    echo "FATAL: nginx version drift detected"
     exit 1
+  fi
+}
+
+NGINX_INSTALLED=$(dpkg-query -W -f='${Version}' nginx 2>/dev/null || true)
+NGINX_COMMON_INSTALLED=$(dpkg-query -W -f='${Version}' nginx-common 2>/dev/null || true)
+
+log "Expected nginx: $NGINX_EXPECTED"
+log "Installed nginx: ${NGINX_INSTALLED:-NOT_FOUND}"
+
+# ---- HARD FAIL IF MISSING ----
+if [[ -z "$NGINX_INSTALLED" ]]; then
+  log "FAIL: nginx is not installed"
+  exit 1
 fi
 
-sudo apt-mark hold nginx nginx-common
+# ---- DRIFT CHECK ----
+if [[ "$NGINX_INSTALLED" != "$NGINX_EXPECTED" ]]; then
+  log "FAIL: nginx version drift detected ($NGINX_INSTALLED != $NGINX_EXPECTED)"
+  exit 1
+fi
 
-pass "Package drift protection enabled"
+# ---- OPTIONAL COMMON PACKAGE CHECK ----
+if [[ -n "$NGINX_COMMON_INSTALLED" && "$NGINX_COMMON_INSTALLED" != "$NGINX_EXPECTED" ]]; then
+  log "FAIL: nginx-common version drift detected ($NGINX_COMMON_INSTALLED != $NGINX_EXPECTED)"
+  exit 1
+fi
+
+pass "Package drift check passed"
 
 # ==========================================================
 log "PHASE 2 - Users & Groups"
@@ -333,3 +394,5 @@ else
     log "FAILED - One or more checks failed"
     exit 1
 fi
+
+verify_package nginx "1.24.0-2ubuntu7.6"
