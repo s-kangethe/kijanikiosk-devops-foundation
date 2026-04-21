@@ -1,14 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ensure script runs as root
 if [[ $EUID -ne 0 ]]; then
   echo "Run as root: sudo bash $0"
   exit 1
 fi
-#!/usr/bin/env bash
-set -euo pipefail
 
+verify_service() {
+  systemctl is-active --quiet "$1" || {
+    echo "SERVICE FAILED: $1"
+    exit 1
+  }
+}
+
+# -----------------------------
+# Logging system
+# -----------------------------
+log()  { echo "[$(date +%F' '%T)] $*"; }
+
+# -----------------------------
+# Global state tracking
+# -----------------------------
 FAILED=0
 
-log()  { echo "[$(date +%F' '%T)] $*"; }
+# -----------------------------
+# Result helpers
+# -----------------------------
 pass() { log "PASS: $*"; }
+
 fail() { log "FAIL: $*"; FAILED=1; }
 
 # ==========================================================
@@ -30,17 +50,24 @@ log "PHASE 1 - Packages"
 
 sudo apt-get update -y
 
-# Remove hold if curl is held
-if apt-mark showhold | grep -q "^curl$"; then
-    sudo apt-mark unhold curl
-    pass "Removed curl hold"
-fi
-
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
     nginx curl ufw acl logrotate python3
 
-pass "Packages installed"
+log "PHASE D - Package Drift Protection"
 
+NGINX_EXPECTED="1.24.0-2ubuntu7.6"
+NGINX_INSTALLED=$(dpkg -l | awk '/nginx / {print $3}')
+
+if [ "$NGINX_INSTALLED" != "$NGINX_EXPECTED" ]; then
+    echo "❌ DRIFT DETECTED"
+    echo "Expected: $NGINX_EXPECTED"
+    echo "Found: $NGINX_INSTALLED"
+    exit 1
+fi
+
+sudo apt-mark hold nginx nginx-common
+
+pass "Package drift protection enabled"
 
 # ==========================================================
 log "PHASE 2 - Users & Groups"
@@ -90,7 +117,7 @@ pass "ACL permissions applied"
 # ==========================================================
 log "PHASE 5 - Environment Files"
 
-echo "PORT=3000" | sudo tee /opt/kijanikiosk/config/api.env 
+echo "PORT=3100" | sudo tee /opt/kijanikiosk/config/api.env 
 echo "PORT=3001" | sudo tee /opt/kijanikiosk/config/payments-api.env 
 echo "PORT=3002" | sudo tee /opt/kijanikiosk/config/logs.env 
 
