@@ -1,0 +1,19 @@
+[Unit]
+Description=KK Payments Service
+After=network.target
+
+[Service]
+User=kk-payments
+ExecStart=/usr/bin/sleep infinity
+
+Restart=always
+
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+ReadWritePaths=/opt/kijanikiosk
+
+[Install]
+WantedBy=multi-user.target

@@ -1,15 +1,16 @@
 resource "aws_instance" "this" {
-  ami           = var.ami_id
+  ami         =var.ami_id
   instance_type = var.instance_type
-  key_name      = var.key_name
+
+  subnet_id                  = var.subnet_id
+
+  vpc_security_group_ids = var.security_group_ids
+
+  associate_public_ip_address = true
+
+  key_name = var.key_name
 
   tags = {
-    Name        = var.name
-    Environment = var.environment
+    Name = "${var.name}-${var.app_tag_suffix}"
   }
-
-  user_data = <<-EOF
-              #!/bin/bash
-              echo "App ${var.name} running on port ${var.port}" > /home/ubuntu/app.txt
-              EOF
 }
