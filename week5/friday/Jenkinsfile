@@ -175,7 +175,7 @@ pipeline {
       echo "Artifact URL: ${NEXUS_URL}/repository/${NEXUS_REPO}/${ARTIFACT_NAME}"
     }
     failure {
-      echo "Build failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}", body: "See console output: ${env.BUILD_URL}"
+      echo "Build failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}" - see ${env.BUILD_URL}"
     }
     changed {
       echo "Build status changed for ${env.JOB_NAME} #${env.BUILD_NUMBER}"
