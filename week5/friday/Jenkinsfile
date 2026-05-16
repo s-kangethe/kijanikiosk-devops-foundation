@@ -30,9 +30,6 @@ pipeline {
         stage('Checkout') {
             steps {
                 checkout scm
-                script {
-                    env.GIT_SHA = env.GIT_COMMIT?.take(7)
-                }
             }
         }
 
@@ -96,7 +93,9 @@ pipeline {
         stage('Versioning') {
             steps {
                 script {
-                    env.VERSION = "1.0.${env.BUILD_NUMBER}-${env.GIT_SHA}"
+                    sh "apk add --no-cache git"
+                    env.GIT_SHA = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+                    env.VERSION = "1.0.0-${env.BUILD_NUMBER}-${env.GIT_SHA}"
                     echo "Version generated: ${env.VERSION}"
                 }
             }
@@ -150,20 +149,7 @@ EOF
     post {
 
         always {
-            cleanWs()
-        }
-
-        success {
-            echo "SUCCESS: ${VERSION}"
-            echo "Artifact published to Nexus"
-        }
-
-        failure {
-            echo "PIPELINE FAILED"
-        }
-
-        changed {
-            echo "PIPELINE STATE CHANGED"
+           echo "Build version: ${env.VERSION}"
         }
     }
 }
