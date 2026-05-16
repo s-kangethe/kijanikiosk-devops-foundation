@@ -7,172 +7,178 @@ pipeline {
         }
     }
 
-    options {
-        timestamps()
-        disableConcurrentBuilds()
-        buildDiscarder(logRotator(numToKeepStr: '10'))
+  options { timeout(time: 10, unit: 'MINUTES') }
+  parameters {
+    string(name: 'VERSION', defaultValue: '', description: 'Optional: set version (semver). If empty, pipeline computes <semver>-<git-sha>')
+  }
+  environment {
+    APP_NAME = 'kijanikiosk-payments'
+    NEXUS_URL = 'http://192.168.100.129:8081'
+    NEXUS_REPO = 'npm-hosted'
+    VERSION = ''
+    ARTIFACT_DIR = 'artifact'
+  }
+
+  stages {
+    stage('Checkout') {
+      steps {
+        checkout scm
+      }
     }
 
-    environment {
-
-        APP_NAME = 'kijanikiosk-payments'
-
-        // Confirmed working Nexus host
-        NEXUS_URL = 'http://192.168.100.129:8081'
-
-        NEXUS_REPO = 'npm-hosted'
-
-        VERSION = ''
+    stage('Lint') {
+      steps {
+        sh '''
+          echo "Running lint stage..."
+          if [ -f package.json ]; then
+            echo "package.json found — running npm lint"
+            npm ci
+            npm run lint
+          else
+            echo "No package.json found — running basic repository checks"
+            # Basic fail-fast checks for common issues in non-node repos:
+            #  - fail if TODO markers remain
+            #  - fail if console.log appears in any .js file (simple policy)
+            set -o pipefail
+            ERR=0
+            if grep -R --line-number -E "TODO" . | grep -v '^./.git' ; then
+              echo "Found TODO markers; treat as lint failure"
+              ERR=1
+            fi
+            if ls **/*.js 1> /dev/null 2>&1; then
+              if grep -R --line-number -E "console\\.log" --exclude-dir=.git --include='*.js' . ; then
+                echo "Found console.log in JS files; treat as lint failure"
+                ERR=1
+              fi
+            fi
+            if [ "$ERR" -ne 0 ]; then
+              echo "Basic lint failed"
+              exit 1
+            fi
+            echo "Basic lint passed"
+          fi
+        '''
+      }
     }
 
-    stages {
+    stage('Build') {
+      steps {
+        sh '''
+          echo "Building artifact contents..."
+          rm -rf dist
+          mkdir -p dist
+          # Replace the following with your real build steps if/when available
+          echo "KijaniKiosk build output" > dist/index.txt
+          echo "Build produced files:"
+          ls -la dist
+        '''
+      }
+    }
 
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Lint (Simulated)') {
-            steps {
-                sh '''
-                echo "Lint stage running..."
-                echo "No Node app present - simulating lint checks"
-                '''
-            }
-        }
-
-        stage('Build (Simulated Artifact Creation)') {
-            steps {
-                sh '''
-                echo "Creating build artifact..."
-
-                mkdir -p dist
-
-                echo "KijaniKiosk build output" > dist/app.txt
-                echo "Build timestamp: $(date)" >> dist/app.txt
-                '''
-            }
-        }
-
-        stage('Verify') {
-
-            parallel {
-
-                stage('Test (Simulated)') {
-                    steps {
-                        sh '''
-                        echo "Simulated test execution..."
-                        echo "All checks passed"
-                        '''
-                    }
-                }
-
-                stage('Security Audit (Simulated)') {
-                    steps {
-                        sh '''
-                        echo "Simulated security scan..."
-                        echo "No vulnerabilities found"
-                        '''
-                    }
-                }
-            }
-        }
-
-        stage('Archive') {
-            steps {
-                sh '''
-                mkdir -p artifact
-                tar -czf artifact/${APP_NAME}.tar.gz dist
-                '''
-
-                archiveArtifacts artifacts: 'artifact/*.tar.gz', fingerprint: true
-            }
-        }
-
-        stage('Setup Tools') {
-            steps {
-                sh '''
-                apk add --no-cache curl
-                '''
-            }
-        }
-
-
-        stage('Versioning') {
-            steps {
-                script {
-
-                    sh '''
-                    git config --global --add safe.directory /var/jenkins_home/workspace/week5-ci-pipeline
-                    git rev-parse --short HEAD
-                    '''
-
-                    env.GIT_SHA = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
-                    env.VERSION = "1.0.0-${env.BUILD_NUMBER}-${env.GIT_SHA}"
-                    echo "Version generated: ${env.VERSION}"
-                }
-            }
-        }
-
-        stage('Publish to Nexus') {
-           steps {
-               withCredentials([usernamePassword(
-               credentialsId: 'nexus-ci-token',
-               usernameVariable: 'NEXUS_USER',
-               passwordVariable: 'NEXUS_PASS'
-               )]) {
-
-            script {
-                def artifactName = "kijanikiosk-payments-${env.VERSION}.tar.gz"
-                def nexusUrl = "http://192.168.100.129:8081/repository/npm-hosted/${artifactName}"
-
-                echo "Uploading artifact:"
-                echo "${artifactName}"
-                echo "To Nexus: ${nexusUrl}"
-
-                sh """
-                    set -e
-
-                    echo "Preparing artifact..."
-
-                    # Ensure artifact exists
-                    mkdir -p artifact
-
-                    # Recreate tar with versioned name (IMPORTANT)
-                    tar -czf artifact/${artifactName} dist
-
-                    echo "Uploading to Nexus..."
-
-                    curl -u $NEXUS_USER:$NEXUS_PASS \
-                        --upload-file artifact/${artifactName} \
-                        ${nexusUrl}
-
-                    echo "Upload complete"
-                """
-             }
-             }
+    stage('Verify') {
+      parallel {
+        stage('Test') {
+          steps {
+            sh '''
+              echo "Running tests (simulated)..."
+              # Replace with real tests if available
+              echo "Simulated tests passed"
+            '''
           }
         }
+        stage('Security Audit') {
+          steps {
+            sh '''
+              echo "Running security audit (simulated)..."
+              # Replace with real audit commands if available
+              echo "Simulated security audit passed"
+            '''
+          }
+        }
+      }
     }
 
-    post {
-
-        always {
-           echo "Build version: ${env.VERSION ?: 'NOT SET'}"
-        }
-
-        success {
-           echo "SUCCESS: ${env.VERSION}"
-           echo "Artifact published to Nexus"
-        }
-        
-        failure {
-           echo "Pipeline Failed"
-        }
-       
-        changed {
-           echo "Pipeline State Changed"
-        }
+    stage('Setup Tools') {
+      steps {
+        sh '''
+          echo "Ensuring required tools are present..."
+          if ! command -v git >/dev/null 2>&1; then
+            echo "git not found — installing git"
+            apk add --no-cache git
+          else
+            echo "git already available: $(git --version)"
+          fi
+        '''
+      }
     }
+
+    stage('Versioning') {
+      steps {
+        script {
+          if (params.VERSION?.trim()) {
+            env.VERSION = params.VERSION.trim()
+          } else {
+            def base = '1.0.0'
+            def sha = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+            env.VERSION = "${base}-${sha}"
+          }
+          env.ARTIFACT_NAME = "${env.APP_NAME}-${env.VERSION}.tar.gz"
+          echo "Using VERSION=${env.VERSION}"
+          echo "Artifact will be ${env.ARTIFACT_NAME}"
+        }
+      }
+    }
+
+    stage('Archive') {
+      steps {
+        sh '''
+          mkdir -p ${ARTIFACT_DIR}
+          tar -czf "${ARTIFACT_DIR}/${ARTIFACT_NAME}" -C dist .
+          ls -la ${ARTIFACT_DIR}
+        '''
+        archiveArtifacts artifacts: "${ARTIFACT_DIR}/${ARTIFACT_NAME}", fingerprint: true
+      }
+    }
+
+    stage('Publish to Nexus') {
+      steps {
+        withCredentials([string(credentialsId: 'nexus-ci-token', variable: 'NEXUS_TOKEN')]) {
+          sh '''
+            set -e
+            # ephemeral .npmrc for this step only
+            NPMRC=$(mktemp)
+            # write token and registry; adapt if your Nexus expects a different auth format
+            echo "//${NEXUS_URL#http://}/repository/${NEXUS_REPO}/:_authToken=${NEXUS_TOKEN}" > ${NPMRC}
+            echo "registry=http://${NEXUS_URL#http://}/repository/${NEXUS_REPO}/" >> ${NPMRC}
+            export NPM_CONFIG_USERCONFIG=${NPMRC}
+
+            # upload artifact using curl to raw repository path
+            UPLOAD_URL="${NEXUS_URL}/repository/${NEXUS_REPO}/${ARTIFACT_NAME}"
+            echo "Uploading ${ARTIFACT_DIR}/${ARTIFACT_NAME} to ${UPLOAD_URL}"
+            curl -sS -u "admin:${NEXUS_TOKEN}" --upload-file "${ARTIFACT_DIR}/${ARTIFACT_NAME}" "${UPLOAD_URL}"
+
+            # cleanup ephemeral file
+            rm -f ${NPMRC}
+            unset NPM_CONFIG_USERCONFIG
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      sh 'echo "Cleaning workspace..."; rm -rf ${ARTIFACT_DIR} dist || true'
+      junit allowEmptyResults: true, testResults: '**/test-results-*.xml'
+    }
+    success {
+      echo "Artifact URL: ${NEXUS_URL}/repository/${NEXUS_REPO}/${ARTIFACT_NAME}"
+    }
+    failure {
+      echo "Build failed: ${env.JOB_NAME} #${env.BUILD_NUMBER}", body: "See console output: ${env.BUILD_URL}"
+    }
+    changed {
+      echo "Build status changed for ${env.JOB_NAME} #${env.BUILD_NUMBER}"
+    }
+  }
 }
