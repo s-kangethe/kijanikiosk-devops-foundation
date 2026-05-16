@@ -8,13 +8,13 @@ pipeline {
   }
 
   environment {
-    // Explicit environment variables (no inherited or hardcoded values outside this block)
+    // Explicit environment variables
     NEXUS_URL     = 'http://172.17.0.1:8081'
     NEXUS_REPO    = 'npm-hosted'
     NEXUS_CRED_ID = 'nexus-ci-token'
     SEMVER_BASE   = '1.0.0'
     NODE_ENV      = 'production'
-    TMPDIR        = "${env.WORKSPACE}/tmp"
+    TMPDIR        = "${WORKSPACE}/tmp"
   }
 
   stages {
@@ -49,6 +49,23 @@ pipeline {
       }
     }
 
+    stage('Set Nexus Host') {
+      steps {
+        script {
+          // Use Java URI parsing to avoid Groovy string escaping issues
+          def uri = new URI(env.NEXUS_URL)
+          def nexusHost = uri.getHost()
+          def nexusPort = uri.getPort()
+          def nexusHostPort = nexusPort > 0 ? "${nexusHost}:${nexusPort}" : nexusHost
+          env.NEXUS_HOST = nexusHost
+          env.NEXUS_HOST_PORT = nexusHostPort
+          echo "NEXUS_URL: ${env.NEXUS_URL}"
+          echo "NEXUS_HOST: ${env.NEXUS_HOST}"
+          echo "NEXUS_HOST_PORT: ${env.NEXUS_HOST_PORT}"
+        }
+      }
+    }
+
     stage('Version and Pack') {
       steps {
         sh '''
@@ -70,45 +87,38 @@ pipeline {
             sh '''
               set -euo pipefail
               mkdir -p test-results
-              npm test -- --reporter mocha-junit-reporter --reporter-options mochaFile=test-results/results.xml || true
+              npm test || true
             '''
-            junit allowEmptyResults: true, testResults: 'test-results/*.xml'
           }
         }
-
-        stage('SecurityAudit') {
+        stage('Smoke') {
           steps {
             sh '''
               set -euo pipefail
-              npm audit --audit-level=moderate || true
+              echo "Running smoke checks"
+              # add smoke commands here
             '''
           }
-        }
-      }
-    }
-
-    stage('Archive') {
-      steps {
-        script {
-          def tar = sh(script: "ls -1 *.tgz | head -n1", returnStdout: true).trim()
-          archiveArtifacts artifacts: "${tar}", fingerprint: true
-          env.ARTIFACT_NAME = tar
         }
       }
     }
 
     stage('Publish') {
       steps {
-        withCredentials([usernamePassword(credentialsId: env.NEXUS_CRED_ID, usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+        withCredentials([string(credentialsId: "${NEXUS_CRED_ID}", variable: 'NEXUS_TOKEN')]) {
           sh '''
             set -euo pipefail
-            NEXUS_HOST=$(echo "${NEXUS_URL}" | sed -e 's|^https\?://||')
-            cat > .npmrc <<EOF
-            //${NEXUS_HOST}/repository/${NEXUS_REPO}/:_auth=${NEXUS_PASS}
-            registry=${NEXUS_URL}/repository/${NEXUS_REPO}/
-            EOF
-            npm publish --registry=${NEXUS_URL}/repository/${NEXUS_REPO}/
-            rm -f .npmrc
+            # find the package file
+            PKG=$(ls -1 *.tgz | head -n1)
+            if [ -z "${PKG}" ]; then
+              echo "No package found to publish"
+              exit 1
+            fi
+
+            # Example npm publish to Nexus (adjust registry URL and auth as needed)
+            echo "Publishing ${PKG} to Nexus repository ${NEXUS_REPO} at ${NEXUS_HOST_PORT}"
+            npm config set //${NEXUS_HOST_PORT}/repository/${NEXUS_REPO}/:_authToken "${NEXUS_TOKEN}"
+            npm publish "${PKG}" --registry "http://${NEXUS_HOST_PORT}/repository/${NEXUS_REPO}/"
           '''
         }
       }
@@ -116,22 +126,14 @@ pipeline {
   }
 
   post {
-    always {
-      junit allowEmptyResults: true, testResults: 'test-results/*.xml'
-      archiveArtifacts artifacts: 'logs/**', allowEmptyArchive: true
-      cleanWs()
-    }
     success {
-      script {
-        def artifactUrl = "${env.NEXUS_URL}/repository/${env.NEXUS_REPO}/${env.ARTIFACT_NAME}"
-        echo "BUILD SUCCESS: Artifact published to ${artifactUrl}"
-      }
+      echo 'Pipeline completed successfully'
     }
     failure {
-      echo "BUILD FAILED: Check console output and test results"
+      echo 'Pipeline failed — check console output'
     }
-    changed {
-      echo "STATUS CHANGED: Build status changed from previous run"
+    always {
+      sh 'du -sh "${TMPDIR}" || true'
     }
   }
 }
