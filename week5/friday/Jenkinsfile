@@ -15,22 +15,25 @@ pipeline {
 
     stages {
 
+        stage('Checkout') {
+            steps {
+                checkout scm
+
+                script {
+                    env.PIPELINE_START = sh(
+                        script: 'date +%s',
+                        returnStdout: true
+                    ).trim()
+                 }
+             }
+         }
+
         stage('Run Inside Docker') {
             steps {
 
                 script {
 
                     docker.image('myregistry/jenkins-node:18-git').inside('-u root:root') {
-
-                        stage('Checkout') {
-
-                            checkout scm
-
-                            env.PIPELINE_START = sh(
-                                script: 'date +%s',
-                                returnStdout: true
-                            ).trim()
-                        }
 
                         stage('Lint (Simulated)') {
 
@@ -91,6 +94,10 @@ pipeline {
                         stage('Versioning') {
 
                             script {
+
+                                sh '''
+                                git config --global --add safe.directory /var/jenkins_home/workspace/week5-ci-pipeline
+                                '''
 
                                 def gitSha = sh(
                                     script: 'git rev-parse --short HEAD',
