@@ -1,0 +1,137 @@
+pipeline {
+  agent { docker { image 'node:18.17.1-alpine' } }
+
+  options {
+    timeout(time: 10, unit: 'MINUTES')
+    buildDiscarder(logRotator(numToKeepStr: '20'))
+    ansiColor('xterm')
+  }
+
+  environment {
+    // Explicit environment variables (no inherited or hardcoded values outside this block)
+    NEXUS_URL     = 'http://172.17.0.1:8081'
+    NEXUS_REPO    = 'npm-hosted'
+    NEXUS_CRED_ID = 'nexus-ci-token'
+    SEMVER_BASE   = '1.0.0'
+    NODE_ENV      = 'production'
+    TMPDIR        = "${env.WORKSPACE}/tmp"
+  }
+
+  stages {
+    stage('Prepare') {
+      steps {
+        sh '''
+          set -euo pipefail
+          mkdir -p "${TMPDIR}"
+          echo "Workspace: ${WORKSPACE}"
+          node --version || true
+          npm --version || true
+        '''
+      }
+    }
+
+    stage('Lint') {
+      steps {
+        sh '''
+          set -euo pipefail
+          npm ci
+          npm run lint
+        '''
+      }
+    }
+
+    stage('Build') {
+      steps {
+        sh '''
+          set -euo pipefail
+          npm run build
+        '''
+      }
+    }
+
+    stage('Version and Pack') {
+      steps {
+        sh '''
+          set -euo pipefail
+          GIT_SHA=$(git rev-parse --short HEAD)
+          NEW_VER="${SEMVER_BASE}-${GIT_SHA}"
+          npm version --no-git-tag-version "${NEW_VER}"
+          echo "Version set to ${NEW_VER}"
+          npm pack
+          ls -la *.tgz
+        '''
+      }
+    }
+
+    stage('Verify (parallel)') {
+      parallel {
+        stage('Test') {
+          steps {
+            sh '''
+              set -euo pipefail
+              mkdir -p test-results
+              npm test -- --reporter mocha-junit-reporter --reporter-options mochaFile=test-results/results.xml || true
+            '''
+            junit allowEmptyResults: true, testResults: 'test-results/*.xml'
+          }
+        }
+
+        stage('SecurityAudit') {
+          steps {
+            sh '''
+              set -euo pipefail
+              npm audit --audit-level=moderate || true
+            '''
+          }
+        }
+      }
+    }
+
+    stage('Archive') {
+      steps {
+        script {
+          def tar = sh(script: "ls -1 *.tgz | head -n1", returnStdout: true).trim()
+          archiveArtifacts artifacts: "${tar}", fingerprint: true
+          env.ARTIFACT_NAME = tar
+        }
+      }
+    }
+
+    stage('Publish') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: env.NEXUS_CRED_ID, usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASS')]) {
+          sh '''
+            set -euo pipefail
+            NEXUS_HOST=$(echo "${NEXUS_URL}" | sed -e 's|^https\?://||')
+            cat > .npmrc <<EOF
+            //${NEXUS_HOST}/repository/${NEXUS_REPO}/:_auth=${NEXUS_PASS}
+            registry=${NEXUS_URL}/repository/${NEXUS_REPO}/
+            EOF
+            npm publish --registry=${NEXUS_URL}/repository/${NEXUS_REPO}/
+            rm -f .npmrc
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      junit allowEmptyResults: true, testResults: 'test-results/*.xml'
+      archiveArtifacts artifacts: 'logs/**', allowEmptyArchive: true
+      cleanWs()
+    }
+    success {
+      script {
+        def artifactUrl = "${env.NEXUS_URL}/repository/${env.NEXUS_REPO}/${env.ARTIFACT_NAME}"
+        echo "BUILD SUCCESS: Artifact published to ${artifactUrl}"
+      }
+    }
+    failure {
+      echo "BUILD FAILED: Check console output and test results"
+    }
+    changed {
+      echo "STATUS CHANGED: Build status changed from previous run"
+    }
+  }
+}
