@@ -2,180 +2,147 @@ def VERSION = "NOT_SET"
 
 pipeline {
 
-    agent {
-        docker {
-            image 'myregistry/jenkins-node:18-git'
-            args '-u root:root'
-        }
-    }
-
-    environment {
-        NEXUS_URL = 'http://192.168.100.129:8081'
-        REPOSITORY = 'npm-hosted'
-    }
+    agent any
 
     options {
         timestamps()
     }
 
+    environment {
+        NEXUS_URL  = 'http://192.168.100.129:8081'
+        NEXUS_REPO = 'npm-hosted'
+    }
+
     stages {
 
-        stage('Checkout') {
-            steps {
-
-                checkout scm
-
-                script {
-
-                    env.PIPELINE_START = sh(
-                        script: 'date +%s',
-                        returnStdout: true
-                    ).trim()
-
-                    sh 'git config --global --add safe.directory "*"'
-                }
-            }
-        }
-
-        stage('Lint (Simulated)') {
-            steps {
-
-                sh '''
-                    echo "Lint stage running..."
-                    echo "No Node app present - simulating lint checks"
-                '''
-            }
-        }
-
-        stage('Build (Simulated Artifact Creation)') {
-            steps {
-
-                sh '''
-                    echo "Creating build artifact..."
-
-                    mkdir -p dist
-
-                    echo "KijaniKiosk build output" > dist/build.txt
-                    echo "Build timestamp: $(date)" >> dist/build.txt
-                '''
-            }
-        }
-
-        stage('Verify') {
-
-            parallel {
-
-                stage('Test (Simulated)') {
-                    steps {
-
-                        sh '''
-                            echo "Simulated test execution..."
-                            echo "All checks passed"
-                        '''
-                    }
-                }
-
-                stage('Security Audit (Simulated)') {
-                    steps {
-
-                        sh '''
-                            echo "Simulated security scan..."
-                            echo "No vulnerabilities found"
-                        '''
-                    }
-                }
-            }
-        }
-
-        stage('Archive') {
-            steps {
-
-                sh '''
-                    mkdir -p artifact
-
-                    tar -czf artifact/kijanikiosk-payments.tar.gz dist
-                '''
-
-                archiveArtifacts artifacts: 'artifact/*.tar.gz', fingerprint: true
-            }
-        }
-
-        stage('Setup Tools') {
-            steps {
-
-                sh '''
-                    apk add --no-cache curl
-                '''
-            }
-        }
-
-        stage('Versioning') {
+        stage('Run Inside Docker') {
             steps {
 
                 script {
 
-                    def gitSha = sh(
-                        script: 'git rev-parse --short HEAD',
-                        returnStdout: true
-                    ).trim()
+                    docker.image('myregistry/jenkins-node:18-git').inside('-u root:root') {
 
-                    def timestamp = sh(
-                        script: 'date +%Y%m%d%H%M%S',
-                        returnStdout: true
-                    ).trim()
+                        stage('Checkout') {
 
-                    VERSION = "${timestamp}-${gitSha}"
+                            checkout scm
 
-                    env.VERSION = VERSION
+                            env.PIPELINE_START = sh(
+                                script: 'date +%s',
+                                returnStdout: true
+                            ).trim()
+                        }
 
-                    echo "Version generated: ${env.VERSION}"
-                }
-            }
-        }
+                        stage('Lint (Simulated)') {
 
-        stage('Publish to Nexus') {
+                            sh '''
+                                echo "Lint stage running..."
+                                echo "No Node app present - simulating lint checks"
+                            '''
+                        }
 
-            steps {
+                        stage('Build (Simulated Artifact Creation)') {
 
-                withCredentials([
-                    usernamePassword(
-                        credentialsId: 'nexus-ci-token',
-                        usernameVariable: 'NEXUS_USER',
-                        passwordVariable: 'NEXUS_PASS'
-                    )
-                ]) {
+                            sh '''
+                                echo "Creating build artifact..."
 
-                    script {
+                                mkdir -p dist
 
-                        def artifactName =
-                            "kijanikiosk-payments-${env.VERSION}.tar.gz"
+                                echo "KijaniKiosk build output" > dist/build.txt
+                                echo "Build timestamp: $(date)" >> dist/build.txt
+                            '''
+                        }
 
-                        def artifactUrl =
-                            "${env.NEXUS_URL}/repository/${env.REPOSITORY}/${artifactName}"
+                        stage('Verify') {
 
-                        echo "Docker Image: myregistry/jenkins-node:18-git"
-                        echo "Artifact Name: ${artifactName}"
-                        echo "Artifact URL: ${artifactUrl}"
+                            parallel(
 
-                        sh """
-                            set -e
+                                "Test (Simulated)" : {
 
-                            echo "Preparing artifact..."
+                                    sh '''
+                                        echo "Simulated test execution..."
+                                        echo "All checks passed"
+                                    '''
+                                },
 
-                            cp artifact/kijanikiosk-payments.tar.gz artifact/${artifactName}
+                                "Security Audit (Simulated)" : {
 
-                            ls -lah artifact/
+                                    sh '''
+                                        echo "Simulated security scan..."
+                                        echo "No vulnerabilities found"
+                                    '''
+                                }
+                            )
+                        }
 
-                            echo "Uploading artifact to Nexus..."
+                        stage('Archive') {
 
-                            curl -v -u \$NEXUS_USER:\$NEXUS_PASS \
-                            --upload-file artifact/${artifactName} \
-                            ${artifactUrl}
+                            sh '''
+                                mkdir -p artifact
 
-                            echo "Artifact uploaded successfully"
-                        """
+                                tar -czf artifact/kijanikiosk-payments.tar.gz dist
+                            '''
 
-                        echo "Artifact successfully uploaded to Nexus"
+                            archiveArtifacts(
+                                artifacts: 'artifact/*.tar.gz',
+                                fingerprint: true
+                            )
+                        }
+
+                        stage('Versioning') {
+
+                            script {
+
+                                def gitSha = sh(
+                                    script: 'git rev-parse --short HEAD',
+                                    returnStdout: true
+                                ).trim()
+
+                                VERSION = "1.0.${env.BUILD_NUMBER}-${gitSha}"
+
+                                env.VERSION = VERSION
+
+                                echo "Version generated: ${VERSION}"
+                            }
+                        }
+
+                        stage('Publish to Nexus') {
+
+                            withCredentials([
+                                usernamePassword(
+                                    credentialsId: 'nexus-ci-token',
+                                    usernameVariable: 'NEXUS_USER',
+                                    passwordVariable: 'NEXUS_PASS'
+                                )
+                            ]) {
+
+                                script {
+
+                                    def artifactName =
+                                        "kijanikiosk-payments-${env.VERSION}.tar.gz"
+
+                                    def artifactUrl =
+                                        "${env.NEXUS_URL}/repository/${env.NEXUS_REPO}/${artifactName}"
+
+                                    echo "Docker Image: myregistry/jenkins-node:18-git"
+
+                                    echo "Artifact Name: ${artifactName}"
+
+                                    echo "Artifact URL: ${artifactUrl}"
+
+                                    sh """
+                                        set +x
+
+                                        cp artifact/kijanikiosk-payments.tar.gz artifact/${artifactName}
+
+                                        curl -u \$NEXUS_USER:\$NEXUS_PASS \
+                                        --upload-file artifact/${artifactName} \
+                                        ${artifactUrl}
+                                    """
+
+                                    echo "Artifact successfully uploaded to Nexus"
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -188,41 +155,44 @@ pipeline {
 
             script {
 
-                def pipelineEnd = sh(
-                    script: 'date +%s',
-                    returnStdout: true
-                ).trim()
+                if (env.PIPELINE_START) {
 
-                def runtime =
-                    pipelineEnd.toInteger() -
-                    env.PIPELINE_START.toInteger()
+                    def pipelineEnd = sh(
+                        script: 'date +%s',
+                        returnStdout: true
+                    ).trim()
 
-                echo "=============================="
-                echo "PIPELINE SUMMARY"
-                echo "=============================="
+                    def runtime =
+                        pipelineEnd.toInteger() -
+                        env.PIPELINE_START.toInteger()
 
-                echo "Docker Image: myregistry/jenkins-node:18-git"
+                    echo "=============================="
+                    echo "PIPELINE SUMMARY"
+                    echo "=============================="
 
-                echo "Version: ${env.VERSION}"
+                    echo "Docker Image: myregistry/jenkins-node:18-git"
 
-                echo "Parallel Stages Executed:"
-                echo "- Test (Simulated)"
-                echo "- Security Audit (Simulated)"
+                    echo "Version: ${env.VERSION}"
 
-                echo "Masked Credentials: ENABLED"
+                    echo "Parallel Stages Executed:"
+                    echo "- Test (Simulated)"
+                    echo "- Security Audit (Simulated)"
 
-                echo "Artifact URL:"
-                echo "${env.NEXUS_URL}/repository/${env.REPOSITORY}/kijanikiosk-payments-${env.VERSION}.tar.gz"
+                    echo "Masked Credentials: ENABLED"
 
-                echo "Pipeline Runtime: ${runtime} seconds"
+                    echo "Artifact URL:"
+                    echo "${env.NEXUS_URL}/repository/${env.NEXUS_REPO}/kijanikiosk-payments-${env.VERSION}.tar.gz"
 
-                if (runtime < 600) {
-                    echo "Runtime Requirement: PASSED (<10 minutes)"
-                } else {
-                    echo "Runtime Requirement: FAILED"
+                    echo "Pipeline Runtime: ${runtime} seconds"
+
+                    if (runtime < 600) {
+                        echo "Runtime Requirement: PASSED (<10 minutes)"
+                    } else {
+                        echo "Runtime Requirement: FAILED"
+                    }
+
+                    echo "=============================="
                 }
-
-                echo "=============================="
             }
         }
 
