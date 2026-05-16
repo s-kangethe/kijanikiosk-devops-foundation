@@ -93,7 +93,7 @@ pipeline {
         stage('Versioning') {
             steps {
                 script {
-                    env.VERSION = "1.0.0-${env.GIT_COMMIT.take(7)}"
+                    env.VERSION = "1.0.0-${sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()}"
                     echo "Version generated: ${env.VERSION}"
                 }
             }
