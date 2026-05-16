@@ -116,38 +116,41 @@ pipeline {
         }
 
         stage('Publish to Nexus') {
+           steps {
+               withCredentials([usernamePassword(
+               credentialsId: 'nexus-ci-token',
+               usernameVariable: 'NEXUS_USER',
+               passwordVariable: 'NEXUS_PASS'
+               )]) {
 
-            steps {
+            script {
+                def artifactName = "kijanikiosk-payments-${env.VERSION}.tar.gz"
+                def nexusUrl = "http://192.168.100.129:8081/repository/npm-hosted/${artifactName}"
 
-                withCredentials([usernamePassword(
-                    credentialsId: 'nexus-ci-token',
-                    usernameVariable: 'NEXUS_USER',
-                    passwordVariable: 'NEXUS_PASS'
-                )]) {
+                echo "Uploading artifact:"
+                echo "${artifactName}"
+                echo "To Nexus: ${nexusUrl}"
 
-                    sh '''
+                sh """
                     set -e
 
-                    echo "Preparing authentication..."
+                    echo "Preparing artifact..."
 
-                    AUTH=$(echo -n "$NEXUS_USER:$NEXUS_PASS" | base64)
+                    # Ensure artifact exists
+                    mkdir -p artifact
 
-                    cat > .npmrc <<EOF
-registry=${NEXUS_URL}/repository/${NEXUS_REPO}/
-always-auth=true
-//192.168.100.129:8081/repository/${NEXUS_REPO}/:_auth=${AUTH}
-email=ci@kijanikiosk.com
-EOF
+                    # Recreate tar with versioned name (IMPORTANT)
+                    tar -czf artifact/${artifactName} dist
 
-                    echo "Uploading artifact to Nexus..."
+                    echo "Uploading to Nexus..."
 
                     curl -u $NEXUS_USER:$NEXUS_PASS \
-                         --upload-file artifact/${APP_NAME}.tar.gz \
-                         ${NEXUS_URL}/repository/${NEXUS_REPO}/${APP_NAME}-${VERSION}.tar.gz
+                        --upload-file artifact/${artifactName} \
+                        ${nexusUrl}
 
-                    rm -f .npmrc
-                    '''
-                }
+                    echo "Upload complete"
+                """
+            }
             }
         }
     }
