@@ -33,6 +33,7 @@ pipeline {
 
                 script {
                     env.GIT_SHA = env.GIT_COMMIT.take(7)
+                    echo "Version generated: ${VERSION}"
                 }
             }
         }
