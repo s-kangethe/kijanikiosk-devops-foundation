@@ -93,7 +93,12 @@ pipeline {
         stage('Versioning') {
             steps {
                 script {
-                    sh "apk add --no-cache git"
+
+                    sh '''
+                    git config --global --add safe.directory /var/jenkins_home/workspace/week5-ci-pipeline
+                    git rev-parse --short HEAD
+                    '''
+
                     env.GIT_SHA = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
                     env.VERSION = "1.0.0-${env.BUILD_NUMBER}-${env.GIT_SHA}"
                     echo "Version generated: ${env.VERSION}"
@@ -149,7 +154,20 @@ EOF
     post {
 
         always {
-           echo "Build version: ${env.VERSION}"
+           echo "Build version: ${env.VERSION ?: 'NOT SET'}"
+        }
+
+        success {
+           echo "SUCCESS: ${env.VERSION}"
+           echo "Artifact published to Nexus"
+        }
+        
+        failure {
+           echo "Pipeline Failed"
+        }
+       
+        changed {
+           echo "Pipeline State Changed"
         }
     }
 }
