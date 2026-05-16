@@ -90,6 +90,15 @@ pipeline {
             }
         }
 
+        stage('Setup Tools') {
+            steps {
+                sh '''
+                apk add --no-cache curl
+                '''
+            }
+        }
+
+
         stage('Versioning') {
             steps {
                 script {
@@ -103,14 +112,6 @@ pipeline {
                     env.VERSION = "1.0.0-${env.BUILD_NUMBER}-${env.GIT_SHA}"
                     echo "Version generated: ${env.VERSION}"
                 }
-            }
-        }
-
-        stage('Setup Tools') {
-            steps {
-                sh '''
-                apk add --no-cache curl
-                '''
             }
         }
 
