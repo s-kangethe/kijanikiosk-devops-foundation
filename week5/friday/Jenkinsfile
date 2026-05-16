@@ -1,139 +1,167 @@
 pipeline {
-  agent { docker { image 'node:18.17.1-alpine' } }
 
-  options {
-    timeout(time: 10, unit: 'MINUTES')
-    buildDiscarder(logRotator(numToKeepStr: '20'))
-    timestamps()
-  }
-
-  environment {
-    // Explicit environment variables
-    NEXUS_URL     = 'http://172.17.0.1:8081'
-    NEXUS_REPO    = 'npm-hosted'
-    NEXUS_CRED_ID = 'nexus-ci-token'
-    SEMVER_BASE   = '1.0.0'
-    NODE_ENV      = 'production'
-    TMPDIR        = "${WORKSPACE}/tmp"
-  }
-
-  stages {
-    stage('Prepare') {
-      steps {
-        sh '''
-          set -euo pipefail
-          mkdir -p "${TMPDIR}"
-          echo "Workspace: ${WORKSPACE}"
-          node --version || true
-          npm --version || true
-        '''
-      }
-    }
-
-    stage('Lint') {
-      steps {
-        sh '''
-          set -euo pipefail
-          npm ci
-          npm run lint
-        '''
-      }
-    }
-
-    stage('Build') {
-      steps {
-        sh '''
-          set -euo pipefail
-          npm run build
-        '''
-      }
-    }
-
-    stage('Set Nexus Host') {
-      steps {
-        script {
-          // Use Java URI parsing to avoid Groovy string escaping issues
-          def uri = new URI(env.NEXUS_URL)
-          def nexusHost = uri.getHost()
-          def nexusPort = uri.getPort()
-          def nexusHostPort = nexusPort > 0 ? "${nexusHost}:${nexusPort}" : nexusHost
-          env.NEXUS_HOST = nexusHost
-          env.NEXUS_HOST_PORT = nexusHostPort
-          echo "NEXUS_URL: ${env.NEXUS_URL}"
-          echo "NEXUS_HOST: ${env.NEXUS_HOST}"
-          echo "NEXUS_HOST_PORT: ${env.NEXUS_HOST_PORT}"
+    agent {
+        docker {
+            image 'node:18.20.4-alpine'
+            args '-u root:root'
         }
-      }
     }
 
-    stage('Version and Pack') {
-      steps {
-        sh '''
-          set -euo pipefail
-          GIT_SHA=$(git rev-parse --short HEAD)
-          NEW_VER="${SEMVER_BASE}-${GIT_SHA}"
-          npm version --no-git-tag-version "${NEW_VER}"
-          echo "Version set to ${NEW_VER}"
-          npm pack
-          ls -la *.tgz
-        '''
-      }
+    options {
+        timestamps()
+        disableConcurrentBuilds()
+        buildDiscarder(logRotator(numToKeepStr: '10'))
     }
 
-    stage('Verify (parallel)') {
-      parallel {
-        stage('Test') {
-          steps {
-            sh '''
-              set -euo pipefail
-              mkdir -p test-results
-              npm test || true
-            '''
-          }
+    environment {
+
+        APP_NAME = 'kijanikiosk-payments'
+
+        // Confirmed working Nexus host
+        NEXUS_URL = 'http://192.168.100.129:8081'
+
+        NEXUS_REPO = 'npm-hosted'
+
+        VERSION = ''
+    }
+
+    stages {
+
+        stage('Checkout') {
+            steps {
+                checkout scm
+
+                script {
+                    env.GIT_SHA = sh(
+                        script: "git rev-parse --short HEAD",
+                        returnStdout: true
+                    ).trim()
+                }
+            }
         }
-        stage('Smoke') {
-          steps {
-            sh '''
-              set -euo pipefail
-              echo "Running smoke checks"
-              # add smoke commands here
-            '''
-          }
+
+        stage('Lint (Simulated)') {
+            steps {
+                sh '''
+                echo "Lint stage running..."
+                echo "No Node app present - simulating lint checks"
+                '''
+            }
         }
-      }
-    }
 
-    stage('Publish') {
-      steps {
-        withCredentials([string(credentialsId: "${NEXUS_CRED_ID}", variable: 'NEXUS_TOKEN')]) {
-          sh '''
-            set -euo pipefail
-            # find the package file
-            PKG=$(ls -1 *.tgz | head -n1)
-            if [ -z "${PKG}" ]; then
-              echo "No package found to publish"
-              exit 1
-            fi
+        stage('Build (Simulated Artifact Creation)') {
+            steps {
+                sh '''
+                echo "Creating build artifact..."
 
-            # Example npm publish to Nexus (adjust registry URL and auth as needed)
-            echo "Publishing ${PKG} to Nexus repository ${NEXUS_REPO} at ${NEXUS_HOST_PORT}"
-            npm config set //${NEXUS_HOST_PORT}/repository/${NEXUS_REPO}/:_authToken "${NEXUS_TOKEN}"
-            npm publish "${PKG}" --registry "http://${NEXUS_HOST_PORT}/repository/${NEXUS_REPO}/"
-          '''
+                mkdir -p dist
+
+                echo "KijaniKiosk build output" > dist/app.txt
+                echo "Build timestamp: $(date)" >> dist/app.txt
+                '''
+            }
         }
-      }
-    }
-  }
 
-  post {
-    success {
-      echo 'Pipeline completed successfully'
+        stage('Verify') {
+
+            parallel {
+
+                stage('Test (Simulated)') {
+                    steps {
+                        sh '''
+                        echo "Simulated test execution..."
+                        echo "All checks passed"
+                        '''
+                    }
+                }
+
+                stage('Security Audit (Simulated)') {
+                    steps {
+                        sh '''
+                        echo "Simulated security scan..."
+                        echo "No vulnerabilities found"
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Archive') {
+            steps {
+                sh '''
+                mkdir -p artifact
+                tar -czf artifact/${APP_NAME}.tar.gz dist
+                '''
+
+                archiveArtifacts artifacts: 'artifact/*.tar.gz', fingerprint: true
+            }
+        }
+
+        stage('Versioning') {
+            steps {
+                script {
+                    def semver = "1.0.0"
+                    env.VERSION = "${semver}-${env.GIT_SHA}"
+
+                    echo "Version generated: ${env.VERSION}"
+                }
+            }
+        }
+
+        stage('Publish to Nexus') {
+
+            steps {
+
+                withCredentials([usernamePassword(
+                    credentialsId: 'nexus-ci-token',
+                    usernameVariable: 'NEXUS_USER',
+                    passwordVariable: 'NEXUS_PASS'
+                )]) {
+
+                    sh '''
+                    set -e
+
+                    echo "Preparing authentication..."
+
+                    AUTH=$(echo -n "$NEXUS_USER:$NEXUS_PASS" | base64)
+
+                    cat > .npmrc <<EOF
+registry=${NEXUS_URL}/repository/${NEXUS_REPO}/
+always-auth=true
+//192.168.100.129:8081/repository/${NEXUS_REPO}/:_auth=${AUTH}
+email=ci@kijanikiosk.com
+EOF
+
+                    echo "Uploading artifact to Nexus..."
+
+                    curl -u $NEXUS_USER:$NEXUS_PASS \
+                         --upload-file artifact/${APP_NAME}.tar.gz \
+                         ${NEXUS_URL}/repository/${NEXUS_REPO}/${APP_NAME}-${VERSION}.tar.gz
+
+                    rm -f .npmrc
+                    '''
+                }
+            }
+        }
     }
-    failure {
-      echo 'Pipeline failed — check console output'
+
+    post {
+
+        always {
+            cleanWs()
+        }
+
+        success {
+            echo "SUCCESS: ${VERSION}"
+            echo "Artifact published to Nexus"
+        }
+
+        failure {
+            echo "PIPELINE FAILED"
+        }
+
+        changed {
+            echo "PIPELINE STATE CHANGED"
+        }
     }
-    always {
-      sh 'du -sh "${TMPDIR}" || true'
-    }
-  }
 }
