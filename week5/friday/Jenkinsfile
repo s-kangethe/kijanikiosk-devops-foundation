@@ -8,13 +8,13 @@ pipeline {
         }
     }
 
-    options {
-        timestamps()
-    }
-
     environment {
         NEXUS_URL = 'http://192.168.100.129:8081'
-        NEXUS_REPO = 'npm-hosted'
+        REPOSITORY = 'npm-hosted'
+    }
+
+    options {
+        timestamps()
     }
 
     stages {
