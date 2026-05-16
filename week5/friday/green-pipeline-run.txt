@@ -1,0 +1,230 @@
+Below is my Console Output on Jenkins to show a successful Build:
+
+Started by user Stacy Kangethe
+Obtained week5/friday/Jenkinsfile from git https://github.com/s-kangethe/kijanikiosk-devops-foundation.git
+[Pipeline] Start of Pipeline
+[Pipeline] node
+Running on Jenkins in /var/jenkins_home/workspace/week5-ci-pipeline
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Declarative: Checkout SCM)
+[Pipeline] checkout
+Selected Git installation does not exist. Using Default
+The recommended git tool is: NONE
+using credential nexus-ci-token
+ > git rev-parse --resolve-git-dir /var/jenkins_home/workspace/week5-ci-pipeline/.git # timeout=10
+Fetching changes from the remote Git repository
+ > git config remote.origin.url https://github.com/s-kangethe/kijanikiosk-devops-foundation.git # timeout=10
+Fetching upstream changes from https://github.com/s-kangethe/kijanikiosk-devops-foundation.git
+ > git --version # timeout=10
+ > git --version # 'git version 2.47.3'
+using GIT_ASKPASS to set credentials Nexus publish user for npm-hosted
+ > git fetch --tags --force --progress -- https://github.com/s-kangethe/kijanikiosk-devops-foundation.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+ > git rev-parse refs/remotes/origin/feature/week5-ci-pipeline^{commit} # timeout=10
+Checking out Revision 7b2fd5aaf495f9941e98c44c6eb77a930bd64ca8 (refs/remotes/origin/feature/week5-ci-pipeline)
+ > git config core.sparsecheckout # timeout=10
+ > git checkout -f 7b2fd5aaf495f9941e98c44c6eb77a930bd64ca8 # timeout=10
+Commit message: "Added GIt safe versioning"
+ > git rev-list --no-walk 88297fe2f8424494a287a16f95b85bbcc7f897fe # timeout=10
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] timestamps
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Checkout)
+[Pipeline] checkout
+00:53:35  Selected Git installation does not exist. Using Default
+00:53:35  The recommended git tool is: NONE
+00:53:35  using credential nexus-ci-token
+00:53:35   > git rev-parse --resolve-git-dir /var/jenkins_home/workspace/week5-ci-pipeline/.git # timeout=10
+00:53:35  Fetching changes from the remote Git repository
+00:53:35   > git config remote.origin.url https://github.com/s-kangethe/kijanikiosk-devops-foundation.git # timeout=10
+00:53:35  Fetching upstream changes from https://github.com/s-kangethe/kijanikiosk-devops-foundation.git
+00:53:35   > git --version # timeout=10
+00:53:35   > git --version # 'git version 2.47.3'
+00:53:35  using GIT_ASKPASS to set credentials Nexus publish user for npm-hosted
+00:53:35   > git fetch --tags --force --progress -- https://github.com/s-kangethe/kijanikiosk-devops-foundation.git +refs/heads/*:refs/remotes/origin/* # timeout=10
+00:53:36   > git rev-parse refs/remotes/origin/feature/week5-ci-pipeline^{commit} # timeout=10
+00:53:36  Checking out Revision 7b2fd5aaf495f9941e98c44c6eb77a930bd64ca8 (refs/remotes/origin/feature/week5-ci-pipeline)
+00:53:36   > git config core.sparsecheckout # timeout=10
+00:53:36   > git checkout -f 7b2fd5aaf495f9941e98c44c6eb77a930bd64ca8 # timeout=10
+00:53:36  Commit message: "Added GIt safe versioning"
+[Pipeline] script
+[Pipeline] {
+[Pipeline] sh
+00:53:36  + date +%s
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Run Inside Docker)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] isUnix
+[Pipeline] withEnv
+[Pipeline] {
+[Pipeline] sh
+00:53:37  + docker inspect -f . myregistry/jenkins-node:18-git
+00:53:37  .
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] withDockerContainer
+00:53:37  Jenkins seems to be running inside container 202537c8bb75cc7d633fa06af6d3c68734a2a4dc2710d9056e9efd0e97cbc53a
+00:53:37  $ docker run -t -d -u 1000:1000 -u root:root -w /var/jenkins_home/workspace/week5-ci-pipeline --volumes-from 202537c8bb75cc7d633fa06af6d3c68734a2a4dc2710d9056e9efd0e97cbc53a -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** -e ******** myregistry/jenkins-node:18-git cat
+00:53:37  $ docker top 1268b09a710658772ebc0d462b8fed839122f6720f685c6c727747b7d20e2a99 -eo pid,comm
+[Pipeline] {
+[Pipeline] stage
+[Pipeline] { (Lint (Simulated))
+[Pipeline] sh
+00:53:37  + echo 'Lint stage running...'
+00:53:37  Lint stage running...
+00:53:37  + echo 'No Node app present - simulating lint checks'
+00:53:37  No Node app present - simulating lint checks
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Build (Simulated Artifact Creation))
+[Pipeline] sh
+00:53:37  + echo 'Creating build artifact...'
+00:53:37  Creating build artifact...
+00:53:37  + mkdir -p dist
+00:53:37  + echo 'KijaniKiosk build output'
+00:53:37  + date
+00:53:37  + echo 'Build timestamp: Sat May 16 21:53:37 UTC 2026'
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Verify)
+[Pipeline] parallel
+[Pipeline] { (Branch: Test (Simulated))
+[Pipeline] { (Branch: Security Audit (Simulated))
+[Pipeline] sh
+[Pipeline] sh
+00:53:38  + echo 'Simulated test execution...'
+00:53:38  Simulated test execution...
+00:53:38  + echo 'All checks passed'
+00:53:38  All checks passed
+00:53:38  + echo 'Simulated security scan...'
+00:53:38  Simulated security scan...
+00:53:38  + echo 'No vulnerabilities found'
+00:53:38  No vulnerabilities found
+[Pipeline] }
+[Pipeline] }
+[Pipeline] // parallel
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Archive)
+[Pipeline] sh
+00:53:38  + mkdir -p artifact
+00:53:38  + tar -czf artifact/kijanikiosk-payments.tar.gz dist
+[Pipeline] archiveArtifacts
+00:53:38  Archiving artifacts
+00:53:38  Recording fingerprints
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Versioning)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] sh
+00:53:38  + git config --global --add safe.directory /var/jenkins_home/workspace/week5-ci-pipeline
+[Pipeline] sh
+00:53:39  + git rev-parse --short HEAD
+[Pipeline] echo
+00:53:39  Version generated: 1.0.39-7b2fd5a
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Publish to Nexus)
+[Pipeline] withCredentials
+00:53:39  Masking supported pattern matches of $NEXUS_PASS
+[Pipeline] {
+[Pipeline] script
+[Pipeline] {
+[Pipeline] echo
+00:53:39  Docker Image: myregistry/jenkins-node:18-git
+[Pipeline] echo
+00:53:39  Artifact Name: kijanikiosk-payments-1.0.39-7b2fd5a.tar.gz
+[Pipeline] echo
+00:53:39  Artifact URL: http://192.168.100.129:8081/repository/npm-hosted/kijanikiosk-payments-1.0.39-7b2fd5a.tar.gz
+[Pipeline] sh
+00:53:39  + set +x
+00:53:39    % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+00:53:39                                   Dload  Upload   Total   Spent    Left  Speed
+00:53:39  
+00:53:39    0     0    0     0    0     0      0      0 --:--:-- --:--:-- --:--:--     0
+00:53:39  100   231    0     0  100   231      0   109k --:--:-- --:--:-- --:--:--  225k
+[Pipeline] echo
+00:53:39  Artifact successfully uploaded to Nexus
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // withCredentials
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+00:53:39  $ docker stop --time=1 1268b09a710658772ebc0d462b8fed839122f6720f685c6c727747b7d20e2a99
+00:53:40  $ docker rm -f --volumes 1268b09a710658772ebc0d462b8fed839122f6720f685c6c727747b7d20e2a99
+[Pipeline] // withDockerContainer
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] stage
+[Pipeline] { (Declarative: Post Actions)
+[Pipeline] script
+[Pipeline] {
+[Pipeline] sh
+00:53:41  + date +%s
+[Pipeline] echo
+00:53:41  ==============================
+[Pipeline] echo
+00:53:41  PIPELINE SUMMARY
+[Pipeline] echo
+00:53:41  ==============================
+[Pipeline] echo
+00:53:41  Docker Image: myregistry/jenkins-node:18-git
+[Pipeline] echo
+00:53:41  Version: 1.0.39-7b2fd5a
+[Pipeline] echo
+00:53:41  Parallel Stages Executed:
+[Pipeline] echo
+00:53:41  - Test (Simulated)
+[Pipeline] echo
+00:53:41  - Security Audit (Simulated)
+[Pipeline] echo
+00:53:41  Masked Credentials: ENABLED
+[Pipeline] echo
+00:53:41  Artifact URL:
+[Pipeline] echo
+00:53:41  http://192.168.100.129:8081/repository/npm-hosted/kijanikiosk-payments-1.0.39-7b2fd5a.tar.gz
+[Pipeline] echo
+00:53:41  Pipeline Runtime: 4 seconds
+[Pipeline] echo
+00:53:41  Runtime Requirement: PASSED (<10 minutes)
+[Pipeline] echo
+00:53:41  ==============================
+[Pipeline] }
+[Pipeline] // script
+[Pipeline] echo
+00:53:41  PIPELINE STATUS: SUCCESS
+[Pipeline] }
+[Pipeline] // stage
+[Pipeline] }
+[Pipeline] // timestamps
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] }
+[Pipeline] // withEnv
+[Pipeline] }
+[Pipeline] // node
+[Pipeline] End of Pipeline
+Finished: SUCCESS
